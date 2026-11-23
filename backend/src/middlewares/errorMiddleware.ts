@@ -24,12 +24,25 @@ export const errorMiddleware = (
   const pg = err as PgError;
   if (pg.code === '23505') {
     const constraint = String(pg.constraint || '');
+    console.warn('⚠️  Violación de unicidad (23505):', {
+      constraint: pg.constraint,
+      detail: (pg as any).detail,
+      table: (pg as any).table,
+    });
     if (constraint.includes('correo')) {
       res.status(400).json({ error: 'El correo ya está registrado' });
       return;
     }
     if (constraint.includes('documento')) {
       res.status(400).json({ error: 'El documento (CI / NIT) ya está registrado' });
+      return;
+    }
+    if (constraint.includes('donacion_pkey') || constraint.includes('donacion_codigo_key')) {
+      res.status(400).json({ error: 'Conflicto con la secuencia o código de la donación. Inténtalo de nuevo.' });
+      return;
+    }
+    if (constraint.includes('comprobante')) {
+      res.status(400).json({ error: 'Conflicto con el número de comprobante de la donación.' });
       return;
     }
     res.status(400).json({ error: 'Datos duplicados' });

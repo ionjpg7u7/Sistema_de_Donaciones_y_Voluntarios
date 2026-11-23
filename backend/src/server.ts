@@ -19,6 +19,7 @@ import type { Server } from 'http';
 
 import app from './app';
 import { testDatabaseConnection, pool } from './config/database';
+import { sincronizarSecuencias } from './utils/syncSecuencias';
 
 // ============================================================================
 // VARIABLES DE ENTORNO
@@ -50,6 +51,9 @@ const startServer = async (): Promise<void> => {
 
     if (!conectado) {
       console.warn('⚠️  El servidor arrancará SIN conexión a la BD (modo desarrollo).');
+    } else {
+      // Sincronizar secuencias para prevenir errores de inserción por seeds con IDs manuales
+      await sincronizarSecuencias();
     }
 
     // 2. Iniciar servidor HTTP

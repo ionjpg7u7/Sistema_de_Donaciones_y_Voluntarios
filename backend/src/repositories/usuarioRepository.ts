@@ -82,6 +82,15 @@ const mapearUsuario = (fila: UsuarioRow): UsuarioResponse => {
   const rol = normalizarRol(fila.rol);
   const estado = normalizarEstadoUsuario(fila.estado);
 
+  // Multi-rol: un usuario puede poseer múltiples roles simultáneamente
+  const roles: string[] = [];
+  if (fila.es_admin || rol === 'Administrador') roles.push('Administrador');
+  if (fila.es_donante || fila.direccion_donante !== null || fila.ubi_latitud !== null || rol === 'Donante') roles.push('Donante');
+  if (fila.estado_voluntario === 'Aprobado' || rol === 'Voluntario') roles.push('Voluntario');
+  if (fila.es_coordinador) roles.push('Coordinador');
+  if (fila.estado_beneficiario === 'Verificado' || rol === 'Beneficiario') roles.push('Beneficiario');
+  if (roles.length === 0) roles.push(rol);
+
   return {
     id_usuario: fila.id_usuario,
     id: fila.id_usuario,
@@ -100,6 +109,7 @@ const mapearUsuario = (fila: UsuarioRow): UsuarioResponse => {
     fecha_registro: fila.fecha_registro,
     fecha_creacion: fila.fecha_registro,
     rol,
+    roles,
     tipo_beneficiario: fila.tipo_beneficiario,
     documento: fila.documento,
     ci_nit: fila.documento,
@@ -125,6 +135,8 @@ const SELECT_USUARIO = `
     SELECT
         u.id_usuario, u.nombre, u.apellido, u.correo, u.telefono, u.foto_url, u.estado,
         u.fecha_registro,
+        (a.id_usuario IS NOT NULL) AS es_admin,
+        (d.id_usuario IS NOT NULL) AS es_donante,
         b.tipo_beneficiario, b.documento,
         b.direccion AS direccion_beneficiario,
         b.necesidad, b.descripcion,

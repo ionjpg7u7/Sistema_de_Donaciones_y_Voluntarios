@@ -12,6 +12,8 @@
 //   solicitudesIntegracion.estaAprobada  → solicitud evaluada y aprobada
 // ============================================================================
 
+import { pool } from '../config/database';
+
 export interface CampanaResumen {
   id_campana: number;
   nombre: string;
@@ -21,12 +23,23 @@ export interface CampanaResumen {
 }
 
 export const campanasIntegracion = {
-  /** Mientras no exista el módulo: no hay campañas activas. */
   async listarActivas(): Promise<CampanaResumen[]> {
-    return [];
+    const { rows } = await pool.query(
+      `SELECT id_campana, nombre, descripcion, to_char(fecha_inicio, 'YYYY-MM-DD') as fecha_inicio, to_char(fecha_fin, 'YYYY-MM-DD') as fecha_fin
+       FROM campana
+       WHERE LOWER(estado) = 'activa'
+       ORDER BY fecha_inicio ASC`
+    );
+    return rows;
   },
-  async estaActiva(_idCampana: number): Promise<boolean> {
-    return false;
+  async estaActiva(idCampana: number): Promise<boolean> {
+    const { rows } = await pool.query(
+      `SELECT 1 FROM campana
+       WHERE id_campana = $1
+         AND LOWER(estado) = 'activa'`,
+      [idCampana]
+    );
+    return rows.length > 0;
   },
 };
 

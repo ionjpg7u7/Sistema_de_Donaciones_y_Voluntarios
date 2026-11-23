@@ -12,10 +12,11 @@ declare global {
         apellido: string;
         correo: string;
         rol: string;
+        roles?: string[];
       };
       file?: Express.Multer.File;
     }
   }
 }
 
-export {};s
+export {};

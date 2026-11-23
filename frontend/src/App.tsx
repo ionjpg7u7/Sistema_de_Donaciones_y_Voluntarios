@@ -22,6 +22,7 @@ import Login from './pages/Login';
 import Registro from './pages/Registro';
 import UsuariosPage from './pages/UsuariosPage';
 import DonacionesPage from './pages/DonacionesPage';
+import CampanasPage from './pages/CampanasPage';
 import Perfil from './pages/Perfil';
 import Dashboard from './pages/Dashboard';
 import SolicitarRecuperacion from './pages/SolicitarRecuperacion';
@@ -48,6 +49,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/perfil" element={<Perfil />} />
             <Route path="/donaciones" element={<DonacionesPage />} />
+            <Route path="/campanas" element={<CampanasPage />} />
 
             {/* Solo administradores */}
             <Route element={<RutasAdmin />}>

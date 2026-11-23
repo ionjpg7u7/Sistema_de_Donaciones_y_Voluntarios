@@ -71,6 +71,7 @@ const FROM_BASE = `
   LEFT JOIN detalle_economico de  ON de.id_donacion = d.id_donacion
   LEFT JOIN donacion_categoria cat ON cat.id_categoria = COALESCE(da.categoria_id, dm.categoria_id)
   LEFT JOIN unidad_medida um       ON um.id_unidad     = COALESCE(da.unidad_medida_id, dm.unidad_medida_id)
+  LEFT JOIN campana c              ON c.id_campana     = d.campana_id
   LEFT JOIN LATERAL (
     SELECT COALESCE(SUM(a.cantidad), 0) AS asignada
       FROM asignacion_donacion a
@@ -84,7 +85,7 @@ const COLS_LISTA = `
   COALESCE(um.codigo, de.moneda_codigo) AS unidad,
   cat.nombre AS categoria,
   d.descripcion, ${TS('d.fecha_donacion')} AS fecha_donacion,
-  d.campana_id, d.estado, d.version,
+  d.campana_id, c.nombre AS campana_nombre, d.estado, d.version,
   d.donante_usuario_id, (ud.nombre || ' ' || ud.apellido) AS donante_nombre,
   d.voluntario_usuario_id,
   asg.asignada AS cantidad_asignada,

@@ -7,8 +7,14 @@ import { jwtDecode } from 'jwt-decode';
 export interface Usuario {
     id: number;
     nombre: string;
+    apellido?: string;
     correo: string;
     rol: string;
+    roles?: string[];
+    estado_voluntario?: string | null;
+    estado_beneficiario?: string | null;
+    es_coordinador?: boolean;
+    foto_url?: string | null;
     exp: number;
     iat?: number;
     [key: string]: unknown;

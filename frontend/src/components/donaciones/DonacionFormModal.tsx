@@ -48,6 +48,11 @@ interface Props {
   modo: ModoFormulario;
   /** Solo en modo 'editar'. */
   donacion?: DonacionDetalle | null;
+  /**
+   * Sprint 3 — ID de campaña pre-seleccionada cuando el usuario viene desde
+   * /campanas → "Donar a esta Campaña". Solo aplica en modo 'propia'.
+   */
+  campanaIdInicial?: number;
   onClose: () => void;
   /** Se invoca tras guardar con éxito (para refrescar listados). */
   onGuardado: () => void;
@@ -99,7 +104,7 @@ const Campo = ({ campo, etiqueta, errores, intento, requerido = true, children }
   </div>
 );
 
-const DonacionFormModal = ({ isOpen, modo, donacion, onClose, onGuardado }: Props) => {
+const DonacionFormModal = ({ isOpen, modo, donacion, campanaIdInicial, onClose, onGuardado }: Props) => {
   const { exito, error: toastError } = useToast();
 
   const [catalogos, setCatalogos] = useState<CatalogosDonacion | null>(null);
@@ -130,7 +135,14 @@ const DonacionFormModal = ({ isOpen, modo, donacion, onClose, onGuardado }: Prop
   useEffect(() => {
     if (!isOpen) return;
     let vivo = true;
-    setValores(edicion && donacion ? desdeDetalle(donacion) : valoresIniciales());
+
+    // Inicializar valores: si hay campanaIdInicial, pre-seleccionarla
+    const valoresBase = edicion && donacion ? desdeDetalle(donacion) : valoresIniciales();
+    if (campanaIdInicial && !edicion) {
+      valoresBase.campana_id = String(campanaIdInicial);
+    }
+    setValores(valoresBase);
+
     setErrores({});
     setErroresServidor([]);
     setIntento(false);
@@ -155,7 +167,7 @@ const DonacionFormModal = ({ isOpen, modo, donacion, onClose, onGuardado }: Prop
     return () => {
       vivo = false;
     };
-  }, [isOpen, edicion, donacion]);
+  }, [isOpen, edicion, donacion, campanaIdInicial]);
 
   const cambiar = useCallback(
     <K extends keyof DonacionFormValores>(campo: K, valor: DonacionFormValores[K]): void => {
@@ -280,6 +292,10 @@ const DonacionFormModal = ({ isOpen, modo, donacion, onClose, onGuardado }: Prop
   const titulo =
     modo === 'editar' ? `Modificar donación ${donacion?.codigo ?? ''}` : modo === 'presencial' ? 'Registrar donación presencial' : 'Registrar donación';
 
+  const subtituloContexto = campanaIdInicial && modo === 'propia'
+    ? `Donando a la campaña #${campanaIdInicial}. Puedes cambiarlo abajo si lo deseas.`
+    : undefined;
+
   const mostrarFormulario = modo !== 'presencial' || donante !== null;
   const cls = (campo: keyof DonacionFormValores): string => (errores[campo] ? claseInputError : claseInput);
 
@@ -292,7 +308,7 @@ const DonacionFormModal = ({ isOpen, modo, donacion, onClose, onGuardado }: Prop
           ? undefined
           : edicion
             ? 'El donante, el tipo y la fecha de la donación no se pueden cambiar.'
-            : 'Los campos con * son obligatorios.'
+            : subtituloContexto ?? 'Los campos con * son obligatorios.'
       }
       ancho="lg"
       bloqueado={guardando}
@@ -657,14 +673,23 @@ const DonacionFormModal = ({ isOpen, modo, donacion, onClose, onGuardado }: Prop
                     />
                   </Campo>
 
-                  {/* Campaña (opcional) */}
+                  {/* Destino: Campaña o Inventario */}
                   <div>
                     <label htmlFor="f-campana_id" className={claseEtiqueta}>
-                      Apoyar una campaña (opcional)
+                      Destino de la donación
                     </label>
+                    {/* Sprint 3: banner cuando viene de una campaña específica */}
+                    {campanaIdInicial && !edicion && (
+                      <div className="mb-2 flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+                        <svg className="h-4 w-4 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Tu donación está pre-asignada a la campaña seleccionada. Puedes cambiar el destino si lo deseas.
+                      </div>
+                    )}
                     {campanas.length === 0 ? (
                       <p className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm text-text-muted">
-                        No hay campañas activas disponibles. La donación se registrará sin campaña.
+                        No hay campañas activas disponibles. La donación ingresará directamente al inventario general.
                       </p>
                     ) : (
                       <select
@@ -673,13 +698,22 @@ const DonacionFormModal = ({ isOpen, modo, donacion, onClose, onGuardado }: Prop
                         onChange={(ev) => cambiar('campana_id', ev.target.value)}
                         className={claseInput}
                       >
-                        <option value="">Sin campaña</option>
+                        <option value="">📦 Directo al Inventario General (almacén central)</option>
                         {campanas.map((c) => (
                           <option key={c.id_campana} value={c.id_campana}>
-                            {c.nombre} ({formatoFecha(c.fecha_inicio)} – {formatoFecha(c.fecha_fin)})
+                            🎯 Campaña: {c.nombre} ({formatoFecha(c.fecha_inicio)} – {formatoFecha(c.fecha_fin)})
                           </option>
                         ))}
                       </select>
+                    )}
+                    {valores.campana_id ? (
+                      <p className="mt-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                        <span>🎯</span> Esta donación se asignará directamente a la campaña seleccionada.
+                      </p>
+                    ) : (
+                      <p className="mt-1.5 text-xs text-text-muted flex items-center gap-1.5">
+                        <span>📦</span> Esta donación ingresará al inventario general para ser canalizada según las necesidades de la comunidad.
+                      </p>
                     )}
                   </div>
                 </>

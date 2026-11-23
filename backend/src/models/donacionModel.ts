@@ -29,6 +29,7 @@ export interface ActorDonacion {
   id_usuario: number;
   rol: RolCanonico;
   nombre: string;
+  roles?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +113,7 @@ export interface DonacionListaItem {
   descripcion: string | null;
   fecha_donacion: string;
   campana_id: number | null;
+  campana_nombre?: string | null;
   estado: EstadoDonacion;
   version: number;
   donante_usuario_id: number | null;

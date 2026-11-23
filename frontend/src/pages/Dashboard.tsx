@@ -312,7 +312,6 @@ const MODULOS_CLIENTE: Modulo[] = [
         iconoBg: 'bg-success-soft text-success',
         badge: 'En vivo',
         badgeClass: 'bg-success-soft text-success',
-        enDesarrollo: true,
     },
     {
         to: '/donaciones',
@@ -323,7 +322,6 @@ const MODULOS_CLIENTE: Modulo[] = [
         iconoBg: 'bg-primary-soft text-primary',
         badge: 'Historial',
         badgeClass: 'bg-primary-soft text-primary',
-        enDesarrollo: true,
     },
     {
         to: '/voluntariados',
@@ -359,7 +357,6 @@ const MODULOS_DONANTE: Modulo[] = [
         iconoBg: 'bg-success-soft text-success',
         badge: 'En vivo',
         badgeClass: 'bg-success-soft text-success',
-        enDesarrollo: true,
     },
     {
         to: '/donaciones',
@@ -370,7 +367,6 @@ const MODULOS_DONANTE: Modulo[] = [
         iconoBg: 'bg-primary-soft text-primary',
         badge: 'Historial',
         badgeClass: 'bg-primary-soft text-primary',
-        enDesarrollo: true,
     },
     {
         to: '/mi-impacto',
@@ -428,7 +424,6 @@ const MODULOS_BENEFICIARIO: Modulo[] = [
         iconoBg: 'bg-warning-soft text-warning',
         badge: 'Abiertas',
         badgeClass: 'bg-warning-soft text-warning',
-        enDesarrollo: true,
     },
     {
         to: '/mi-perfil-solidario',
@@ -843,6 +838,32 @@ const Dashboard = () => {
                         ? PANEL_VOLUNTARIO
                         : PANEL_USUARIO;
 
+    // ── Multi-rol: detectar roles secundarios del JWT (campo 'roles' o derivar del estado del usuario)
+    // El token puede traer un array 'roles' además del campo 'rol' principal.
+    const rolesSecundarios: PanelRol[] = [];
+    const rolesJwt: string[] = Array.isArray((usuario as any)?.roles)
+        ? (usuario as any).roles.map((r: string) => r.toLowerCase())
+        : [];
+
+    // Si el usuario tiene estado_voluntario Aprobado pero su rol principal NO es voluntario
+    const esVoluntarioSecundario = (usuario as any)?.estado_voluntario === 'Aprobado' &&
+        rolNormalizado !== 'voluntario' && rolNormalizado !== 'administrador';
+    // Si el usuario tiene estado_beneficiario Verificado pero su rol principal NO es beneficiario
+    const esBeneficiarioSecundario = (usuario as any)?.estado_beneficiario === 'Verificado' &&
+        rolNormalizado !== 'beneficiario' && rolNormalizado !== 'administrador';
+
+    if (esVoluntarioSecundario || rolesJwt.includes('voluntario')) {
+        rolesSecundarios.push(PANEL_VOLUNTARIO);
+    }
+    if (esBeneficiarioSecundario || rolesJwt.includes('beneficiario')) {
+        rolesSecundarios.push(PANEL_BENEFICIARIO);
+    }
+    if ((rolNormalizado === 'voluntario' || rolesJwt.includes('donante')) &&
+        rolNormalizado !== 'donante' && rolNormalizado !== 'administrador') {
+        // Donante como secundario solo si el JWT lo indica
+        if (rolesJwt.includes('donante')) rolesSecundarios.push(PANEL_DONANTE);
+    }
+
     return (
         <div className="pb-10">
             <div className="space-y-8">
@@ -962,6 +983,40 @@ const Dashboard = () => {
                             ))}
                         </div>
                     </section>
+
+                    {/* ── ROLES SECUNDARIOS (multi-rol) ── */}
+                    {rolesSecundarios.map((panelSecundario, idx) => {
+                        const etiquetaRol =
+                            panelSecundario === PANEL_VOLUNTARIO ? 'También eres Voluntario' :
+                            panelSecundario === PANEL_DONANTE   ? 'También eres Donante'    :
+                                                                  'También eres Beneficiario';
+                        return (
+                            <section key={idx} className="space-y-6 border-t border-border pt-8">
+                                <div className="flex items-center gap-3">
+                                    <span className="rounded-full bg-primary-soft px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary">
+                                        {etiquetaRol}
+                                    </span>
+                                </div>
+                                <div className="anim-rise mb-6 flex flex-wrap items-end justify-between gap-3">
+                                    <div>
+                                        <h2 className="font-display text-xl font-bold tracking-[-0.02em] text-text">
+                                            {panelSecundario.seccionTitulo}
+                                        </h2>
+                                        <p className="mt-1 text-sm text-text-muted">{panelSecundario.seccionSubtitulo}</p>
+                                    </div>
+                                    <span className="rounded-full border border-border bg-surface-elevated px-3 py-1 text-[10.5px] font-bold uppercase tracking-[0.12em] text-text-muted shadow-soft">
+                                        {panelSecundario.modulos.length} {panelSecundario.modulos.length === 1 ? 'módulo' : 'módulos'}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 md:gap-5 xl:grid-cols-4">
+                                    {panelSecundario.kpis.map((kpi, i) => <KpiCard key={kpi.etiqueta + idx} kpi={kpi} index={i} />)}
+                                </div>
+                                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+                                    {panelSecundario.modulos.map((modulo, i) => <ModuloCard key={modulo.to + modulo.titulo + idx} modulo={modulo} index={i} />)}
+                                </div>
+                            </section>
+                        );
+                    })}
 
                     {/* Postulaciones accesibles para cualquier cuenta autenticada */}
                     <section className="anim-rise rounded-3xl border border-border bg-surface-elevated p-5 shadow-soft sm:p-6">

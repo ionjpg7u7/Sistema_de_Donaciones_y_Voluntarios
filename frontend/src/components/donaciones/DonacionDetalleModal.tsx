@@ -312,7 +312,15 @@ const DonacionDetalleModal = ({ donacionId, rol, onClose, onCambio }: Props) => 
                 {detalle.estado_material && <Dato etiqueta="Estado del material">{ETIQUETA_ESTADO_MATERIAL[detalle.estado_material]}</Dato>}
                 {detalle.metodo_pago && <Dato etiqueta="Método de pago">{ETIQUETA_METODO_PAGO[detalle.metodo_pago]}</Dato>}
                 {detalle.referencia_pago && <Dato etiqueta="Referencia">{detalle.referencia_pago}</Dato>}
-                <Dato etiqueta="Campaña">{detalle.campana_id ? `Campaña n.º ${detalle.campana_id}` : 'Sin campaña'}</Dato>
+                <Dato etiqueta="Destino">
+                  {detalle.campana_id ? (
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                      🎯 {detalle.campana_nombre ? `Campaña "${detalle.campana_nombre}"` : `Campaña n.º ${detalle.campana_id}`}
+                    </span>
+                  ) : (
+                    <span className="text-text-muted">📦 Inventario General (almacén central)</span>
+                  )}
+                </Dato>
                 {detalle.descripcion && (
                   <div className="sm:col-span-2 lg:col-span-3">
                     <Dato etiqueta="Descripción">{detalle.descripcion}</Dato>

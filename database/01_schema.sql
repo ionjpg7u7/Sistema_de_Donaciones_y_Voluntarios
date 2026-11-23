@@ -318,28 +318,15 @@ CREATE TABLE IF NOT EXISTS inventario (
     CONSTRAINT uq_inventario_origen UNIQUE (id_inventario, id_donacion)
 );
 
--- Cabecera de entrega física a beneficiarios dentro de Gestión de Donaciones.
--- El detalle de productos/cantidades se conserva en inventario_destino.
-CREATE TABLE IF NOT EXISTS entrega_donacion (
-    id_entrega SERIAL PRIMARY KEY,
-    fecha_entrega TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz'),
-    lugar_entrega VARCHAR(180) NOT NULL,
-    responsable_usuario_id INT NOT NULL REFERENCES administrador(id_usuario) ON DELETE RESTRICT,
-    observaciones TEXT,
-    estado VARCHAR(12) NOT NULL DEFAULT 'REGISTRADA'
-        CHECK (estado IN ('REGISTRADA','ANULADA'))
-);
-
--- Registro de salidas del inventario: campañas, solicitudes o entregas
--- físicas a beneficiarios. Las FK de campañas/solicitudes se integran después.
+-- Registro de salida futura del inventario. La FK al módulo propietario se
+-- incorpora cuando Campañas/Solicitudes entreguen sus esquemas reales.
+-- Exactamente uno de los destinos debe informarse.
 CREATE TABLE IF NOT EXISTS inventario_destino (
     id_destino          SERIAL PRIMARY KEY,
     id_inventario       INT NOT NULL,
     id_donacion         INT NOT NULL,
     campana_id          INT,
     solicitud_ayuda_id  INT,
-    id_asignacion       INT REFERENCES asignacion_donacion(id_asignacion) ON DELETE RESTRICT,
-    id_entrega          INT REFERENCES entrega_donacion(id_entrega) ON DELETE RESTRICT,
     cantidad            NUMERIC(14,2) NOT NULL CHECK (cantidad > 0),
     fecha_salida        TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz'),
     registrado_por_usuario_id INT NOT NULL REFERENCES administrador(id_usuario) ON DELETE RESTRICT,
@@ -349,36 +336,12 @@ CREATE TABLE IF NOT EXISTS inventario_destino (
     CONSTRAINT fk_inventario_destino_origen FOREIGN KEY (id_inventario,id_donacion)
       REFERENCES inventario(id_inventario,id_donacion) ON DELETE RESTRICT,
     CONSTRAINT chk_inventario_destino_unico CHECK (
-      (campana_id IS NOT NULL AND solicitud_ayuda_id IS NULL
-       AND id_asignacion IS NULL AND id_entrega IS NULL) OR
-      (campana_id IS NULL AND solicitud_ayuda_id IS NOT NULL
-       AND id_asignacion IS NULL AND id_entrega IS NULL) OR
-      (campana_id IS NULL AND solicitud_ayuda_id IS NULL
-       AND id_asignacion IS NOT NULL AND id_entrega IS NOT NULL)
+      (campana_id IS NOT NULL AND solicitud_ayuda_id IS NULL) OR
+      (campana_id IS NULL AND solicitud_ayuda_id IS NOT NULL)
     )
 );
 
--- Compatibilidad con bases ya creadas antes de incorporar Entregas.
--- Permite aplicar esta ampliación sobre la tabla existente sin crear otro .sql.
-ALTER TABLE inventario_destino
-    ADD COLUMN IF NOT EXISTS id_asignacion INT
-        REFERENCES asignacion_donacion(id_asignacion) ON DELETE RESTRICT;
-ALTER TABLE inventario_destino
-    ADD COLUMN IF NOT EXISTS id_entrega INT
-        REFERENCES entrega_donacion(id_entrega) ON DELETE RESTRICT;
-ALTER TABLE inventario_destino
-    DROP CONSTRAINT IF EXISTS chk_inventario_destino_unico;
-ALTER TABLE inventario_destino
-    ADD CONSTRAINT chk_inventario_destino_unico CHECK (
-      (campana_id IS NOT NULL AND solicitud_ayuda_id IS NULL
-       AND id_asignacion IS NULL AND id_entrega IS NULL) OR
-      (campana_id IS NULL AND solicitud_ayuda_id IS NOT NULL
-       AND id_asignacion IS NULL AND id_entrega IS NULL) OR
-      (campana_id IS NULL AND solicitud_ayuda_id IS NULL
-       AND id_asignacion IS NOT NULL AND id_entrega IS NOT NULL)
-    );
-
--- Las salidas se descuentan del inventario dentro de la misma transacción.
+-- Las salidas futuras se descuentan del inventario dentro de la misma
 -- transacción. No se consulta ni modifica ninguna tabla de Campañas/Ayudas.
 CREATE OR REPLACE FUNCTION fn_controlar_salida_inventario() RETURNS trigger AS $$
 DECLARE
@@ -391,9 +354,7 @@ BEGIN
   IF TG_OP = 'UPDATE' THEN
     IF NEW.id_inventario <> OLD.id_inventario OR NEW.id_donacion <> OLD.id_donacion
        OR NEW.cantidad <> OLD.cantidad OR NEW.campana_id IS DISTINCT FROM OLD.campana_id
-       OR NEW.solicitud_ayuda_id IS DISTINCT FROM OLD.solicitud_ayuda_id
-       OR NEW.id_asignacion IS DISTINCT FROM OLD.id_asignacion
-       OR NEW.id_entrega IS DISTINCT FROM OLD.id_entrega THEN
+       OR NEW.solicitud_ayuda_id IS DISTINCT FROM OLD.solicitud_ayuda_id THEN
       RAISE EXCEPTION 'No se puede cambiar el origen, cantidad o destino de una salida; anule y registre una nueva.';
     END IF;
     IF OLD.estado = NEW.estado THEN RETURN NEW; END IF;
@@ -453,12 +414,6 @@ CREATE INDEX IF NOT EXISTS idx_inventario_estado ON inventario(estado, fecha_ing
 CREATE INDEX IF NOT EXISTS idx_inventario_destino_donacion ON inventario_destino(id_donacion);
 CREATE INDEX IF NOT EXISTS idx_inventario_destino_campana ON inventario_destino(campana_id) WHERE campana_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_inventario_destino_solicitud ON inventario_destino(solicitud_ayuda_id) WHERE solicitud_ayuda_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_inventario_destino_asignacion ON inventario_destino(id_asignacion) WHERE id_asignacion IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_inventario_destino_entrega ON inventario_destino(id_entrega) WHERE id_entrega IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_entrega_donacion_fecha ON entrega_donacion(fecha_entrega DESC);
-CREATE INDEX IF NOT EXISTS idx_inventario_destino_asignacion ON inventario_destino(id_asignacion) WHERE id_asignacion IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_inventario_destino_entrega ON inventario_destino(id_entrega) WHERE id_entrega IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_entrega_donacion_fecha ON entrega_donacion(fecha_entrega DESC);
 CREATE INDEX IF NOT EXISTS idx_donacion_fotos_donacion ON donacion_fotos(id_donacion);
 
 -- Cada recepción física aceptada de bienes crea automáticamente una partida
@@ -494,3 +449,197 @@ DROP TRIGGER IF EXISTS trg_recepcion_a_inventario ON donacion_recepciones;
 CREATE TRIGGER trg_recepcion_a_inventario
 AFTER INSERT ON donacion_recepciones
 FOR EACH ROW EXECUTE FUNCTION fn_ingresar_donacion_a_inventario();
+
+-- =========================================================
+-- MÓDULO 3: GESTIÓN DE CAMPAÑAS Y ACTIVIDADES (Sprint 3)
+-- =========================================================
+
+-- 1. TABLA CAMPAÑA
+CREATE TABLE IF NOT EXISTS campana (
+    id_campana           SERIAL PRIMARY KEY,
+    nombre               VARCHAR(150) NOT NULL,
+    descripcion          TEXT,
+    portada_url          VARCHAR(500),
+    fecha_inicio         DATE NOT NULL,
+    fecha_fin            DATE,
+    objetivo_recaudacion NUMERIC(14,2) DEFAULT NULL,
+    estado               VARCHAR(20) NOT NULL DEFAULT 'Planificada'
+                         CHECK (estado IN ('Planificada', 'Activa', 'Pausada', 'Finalizada', 'Cancelada')),
+    id_administrador     INT NOT NULL,
+    fecha_creacion       TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz'),
+    fecha_actualizacion  TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz'),
+    CONSTRAINT fk_campana_administrador FOREIGN KEY (id_administrador)
+        REFERENCES administrador(id_usuario) ON DELETE RESTRICT,
+    CONSTRAINT chk_campana_fechas CHECK (fecha_fin IS NULL OR fecha_fin >= fecha_inicio),
+    CONSTRAINT chk_campana_objetivo CHECK (objetivo_recaudacion IS NULL OR objetivo_recaudacion >= 0)
+);
+
+-- Vincular donación e inventario_destino con la tabla campana
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_donacion_campana'
+    ) THEN
+        ALTER TABLE donacion
+            ADD CONSTRAINT fk_donacion_campana
+            FOREIGN KEY (campana_id) REFERENCES campana(id_campana) ON DELETE SET NULL;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_inventario_destino_campana'
+    ) THEN
+        ALTER TABLE inventario_destino
+            ADD CONSTRAINT fk_inventario_destino_campana
+            FOREIGN KEY (campana_id) REFERENCES campana(id_campana) ON DELETE RESTRICT;
+    END IF;
+END $$;
+
+-- 2. TABLA ACTIVIDAD
+-- Soporta los 3 tipos de iniciativas/destinos de donación y voluntariado:
+-- a) Campañas
+-- b) Solicitudes de ayuda
+-- c) Donaciones directas al inventario / Actividades generales
+CREATE TABLE IF NOT EXISTS actividad (
+    id_actividad            SERIAL PRIMARY KEY,
+    nombre                  VARCHAR(150) NOT NULL,
+    descripcion             TEXT,
+    fecha                   DATE NOT NULL,
+    hora_inicio             TIME NOT NULL,
+    hora_fin                TIME NOT NULL,
+    lugar                   VARCHAR(255) NOT NULL,
+    max_voluntarios         INT NOT NULL CHECK (max_voluntarios > 0),
+    tipo_actividad          VARCHAR(30) NOT NULL DEFAULT 'CAMPANA'
+                            CHECK (tipo_actividad IN ('CAMPANA', 'SOLICITUD_AYUDA', 'INVENTARIO', 'GENERAL')),
+    solicitud_ayuda_id      INT DEFAULT NULL, -- Enlace para el módulo de Solicitudes de Ayuda
+    id_donacion             INT DEFAULT NULL, -- Enlace opcional a donación directa (ej. recojo en domicilio)
+    estado                  VARCHAR(20) NOT NULL DEFAULT 'Planificada'
+                            CHECK (estado IN ('Planificada', 'En_Curso', 'Finalizada', 'Cancelada')),
+    creado_por_usuario_id   INT NOT NULL,
+    fecha_creacion          TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz'),
+    fecha_actualizacion     TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz'),
+    CONSTRAINT fk_actividad_creador FOREIGN KEY (creado_por_usuario_id)
+        REFERENCES usuario(id_usuario) ON DELETE RESTRICT,
+    CONSTRAINT fk_actividad_donacion FOREIGN KEY (id_donacion)
+        REFERENCES donacion(id_donacion) ON DELETE SET NULL,
+    CONSTRAINT chk_actividad_horas CHECK (hora_fin > hora_inicio)
+);
+
+-- 3. ACTIVIDAD_CAMPAÑA (Relación N:M entre Actividad y Campaña según MR)
+CREATE TABLE IF NOT EXISTS actividad_campana (
+    id_actividad     INT NOT NULL,
+    id_campana       INT NOT NULL,
+    fecha_asignacion TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz'),
+    PRIMARY KEY (id_actividad, id_campana),
+    CONSTRAINT fk_actcamp_actividad FOREIGN KEY (id_actividad)
+        REFERENCES actividad(id_actividad) ON DELETE CASCADE,
+    CONSTRAINT fk_actcamp_campana FOREIGN KEY (id_campana)
+        REFERENCES campana(id_campana) ON DELETE CASCADE
+);
+
+-- 4. PARTICIPA (Voluntarios inscritos en Actividades)
+CREATE TABLE IF NOT EXISTS participa (
+    id_participacion            SERIAL PRIMARY KEY,
+    id_voluntario               INT NOT NULL,
+    id_actividad                INT NOT NULL,
+    fecha_inscripcion           TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz'),
+    asistio                     BOOLEAN NOT NULL DEFAULT FALSE,
+    estado                      VARCHAR(20) NOT NULL DEFAULT 'Inscrito'
+                                CHECK (estado IN ('Inscrito', 'Confirmado', 'Asistio', 'No_Asistio', 'Cancelado')),
+    observaciones               TEXT,
+    horas_acreditadas           NUMERIC(4,2) NOT NULL DEFAULT 0 CHECK (horas_acreditadas >= 0),
+    fecha_asistencia            TIMESTAMP,
+    marcado_por_usuario_id      INT,
+    CONSTRAINT fk_participa_usuario FOREIGN KEY (id_voluntario)
+        REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+    CONSTRAINT fk_participa_actividad FOREIGN KEY (id_actividad)
+        REFERENCES actividad(id_actividad) ON DELETE CASCADE,
+    CONSTRAINT fk_participa_marcador FOREIGN KEY (marcado_por_usuario_id)
+        REFERENCES usuario(id_usuario) ON DELETE SET NULL,
+    CONSTRAINT uq_participa_voluntario_actividad UNIQUE (id_voluntario, id_actividad)
+);
+
+-- 5. ÍNDICES MÓDULO 3
+CREATE INDEX IF NOT EXISTS idx_campana_estado ON campana(estado);
+CREATE INDEX IF NOT EXISTS idx_campana_fechas ON campana(fecha_inicio, fecha_fin);
+CREATE INDEX IF NOT EXISTS idx_actividad_fecha ON actividad(fecha);
+CREATE INDEX IF NOT EXISTS idx_actividad_estado ON actividad(estado);
+CREATE INDEX IF NOT EXISTS idx_actividad_tipo ON actividad(tipo_actividad);
+CREATE INDEX IF NOT EXISTS idx_actcamp_campana ON actividad_campana(id_campana);
+CREATE INDEX IF NOT EXISTS idx_participa_voluntario ON participa(id_voluntario);
+CREATE INDEX IF NOT EXISTS idx_participa_actividad ON participa(id_actividad);
+CREATE INDEX IF NOT EXISTS idx_participa_estado ON participa(estado);
+
+-- 6. TRIGGERS Y FUNCIONES DE NEGOCIO
+
+-- A) Control de cupo máximo de voluntarios por actividad
+CREATE OR REPLACE FUNCTION fn_verificar_cupo_actividad() RETURNS trigger AS $$
+DECLARE
+    v_max INT;
+    v_actual INT;
+BEGIN
+    IF NEW.estado = 'Cancelado' THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT max_voluntarios INTO v_max
+      FROM actividad
+     WHERE id_actividad = NEW.id_actividad;
+
+    SELECT COUNT(*) INTO v_actual
+      FROM participa
+     WHERE id_actividad = NEW.id_actividad
+       AND estado <> 'Cancelado'
+       AND (TG_OP = 'INSERT' OR id_participacion <> NEW.id_participacion);
+
+    IF v_actual >= v_max THEN
+        RAISE EXCEPTION 'No hay cupos disponibles para esta actividad (cupo máximo: %)', v_max;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_verificar_cupo_actividad ON participa;
+CREATE TRIGGER trg_verificar_cupo_actividad
+BEFORE INSERT OR UPDATE OF id_actividad, estado ON participa
+FOR EACH ROW EXECUTE FUNCTION fn_verificar_cupo_actividad();
+
+-- B) Conversión y aprobación automática de voluntario al completar actividad (regla de negocio del sistema)
+-- "un usuario normal se convierte en voluntario solo cuando se haya inscrito a una actividad,
+-- al haber completado la actividad se le marca asistencia y ahi ese usuario ya podra ser un voluntario"
+CREATE OR REPLACE FUNCTION fn_promover_voluntario_por_asistencia() RETURNS trigger AS $$
+DECLARE
+    v_existe_voluntario BOOLEAN;
+BEGIN
+    IF (NEW.asistio = TRUE OR NEW.estado = 'Asistio') THEN
+        SELECT EXISTS(SELECT 1 FROM voluntario WHERE id_usuario = NEW.id_voluntario) INTO v_existe_voluntario;
+
+        IF NOT v_existe_voluntario THEN
+            INSERT INTO voluntario (id_usuario, habilidades, disponibilidad, estado, revisado_por, fecha_revision)
+            VALUES (
+                NEW.id_voluntario,
+                ARRAY['Participación en actividades'],
+                'Fines de semana y convocatorias',
+                'Aprobado',
+                NEW.marcado_por_usuario_id,
+                (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz')
+            );
+        ELSE
+            UPDATE voluntario
+               SET estado = 'Aprobado',
+                   revisado_por = COALESCE(revisado_por, NEW.marcado_por_usuario_id),
+                   fecha_revision = COALESCE(fecha_revision, (CURRENT_TIMESTAMP AT TIME ZONE 'America/La_Paz'))
+             WHERE id_usuario = NEW.id_voluntario
+               AND estado = 'Pendiente';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_promover_voluntario_por_asistencia ON participa;
+CREATE TRIGGER trg_promover_voluntario_por_asistencia
+AFTER INSERT OR UPDATE OF asistio, estado ON participa
+FOR EACH ROW EXECUTE FUNCTION fn_promover_voluntario_por_asistencia();
+
+

@@ -43,6 +43,8 @@ export interface UsuarioRow {
   revisado_por_voluntario: number | null;
   motivo_rechazo_voluntario: string | null;
   fecha_registro_voluntario: Date | string | null;
+  es_donante?: boolean;
+  es_admin?: boolean;
   rol: RolUsuario;
 }
 
@@ -106,6 +108,7 @@ export interface UsuarioResponse {
   fecha_registro_voluntario?: Date | string | null;
   token_recuperacion?: string | null;
   fecha_expiracion_token?: Date | string | null;
+  roles?: string[];
 }
 
 /** Datos de la tabla `usuario` (común). */

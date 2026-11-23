@@ -46,6 +46,9 @@ const firmarToken = (usuario: UsuarioResponse): string =>
       apellido: usuario.apellido,
       correo: usuario.correo,
       rol: usuario.rol,
+      roles: usuario.roles || [usuario.rol],
+      estado_voluntario: usuario.estado_voluntario,
+      estado_beneficiario: usuario.estado_beneficiario,
       es_coordinador: Boolean(usuario.es_coordinador),
       foto_url: usuario.foto_url,
     },
@@ -179,6 +182,9 @@ export const authService = {
       telefono: string | null;
       estado: string;
       rol: string;
+      roles?: string[];
+      estado_voluntario?: string | null;
+      estado_beneficiario?: string | null;
       es_coordinador?: boolean;
       foto_url?: string | null;
     };
@@ -229,6 +235,9 @@ export const authService = {
         telefono: usuario.telefono,
         estado: usuario.estado,
         rol: usuario.rol,
+        roles: usuario.roles || [usuario.rol],
+        estado_voluntario: usuario.estado_voluntario,
+        estado_beneficiario: usuario.estado_beneficiario,
         es_coordinador: Boolean(usuario.es_coordinador),
         foto_url: usuario.foto_url || null,
       },

@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
 import DonacionFormModal, { type ModoFormulario } from './DonacionFormModal';
 import DonacionDetalleModal from './DonacionDetalleModal';
 import { EstadoBadge } from './EstadoBadge';
@@ -32,6 +33,10 @@ import { btnPrimario, btnSecundario, claseInput, tarjeta } from './estilos';
 
 interface Props {
   rol: RolDonaciones;
+  /** Sprint 3: ID de campaña pre-seleccionada cuando se viene desde /campanas */
+  campanaIdInicial?: number;
+  /** Se invoca una vez que el campanaIdInicial fue consumido */
+  onCampanaIdConsumido?: () => void;
 }
 
 const FILTROS_VACIOS: FiltrosDonacion = {
@@ -57,7 +62,7 @@ const ESTADOS: EstadoDonacion[] = ['REGISTRADA', 'ASIGNADA_PARCIAL', 'ASIGNADA_T
 
 const unidadMostrada = (d: DonacionListaItem): string | null => d.unidad;
 
-const DonacionesTab = ({ rol }: Props) => {
+const DonacionesTab = ({ rol, campanaIdInicial, onCampanaIdConsumido }: Props) => {
   const [borrador, setBorrador] = useState<FiltrosDonacion>(FILTROS_VACIOS);
   const [aplicados, setAplicados] = useState<FiltrosDonacion>(FILTROS_VACIOS);
   const [datos, setDatos] = useState<Paginado<DonacionListaItem> | null>(null);
@@ -69,10 +74,23 @@ const DonacionesTab = ({ rol }: Props) => {
   const [formulario, setFormulario] = useState<ModoFormulario | null>(null);
   const [detalleId, setDetalleId] = useState<number | null>(null);
 
-  const puedeDonar = rol === 'Donante';
+  // campanaIdInicial consumido: estado local para pasarlo al modal
+  const [campanaIdModalInicial, setCampanaIdModalInicial] = useState<number | undefined>(campanaIdInicial);
+
+  const { usuario } = useAuth();
+  const puedeDonar = rol === 'Donante' || Boolean(usuario?.roles?.includes('Donante'));
   const puedePresencial = rol === 'Voluntario' || rol === 'Administrador';
   const veDonante = rol === 'Administrador' || rol === 'Voluntario';
-  const { titulo, subtitulo } = TITULOS[rol];
+  const { titulo, subtitulo } = TITULOS[rol] ?? TITULOS.Donante;
+
+  // Sprint 3: si llegamos con campanaIdInicial, abrimos el modal de donar automáticamente
+  useEffect(() => {
+    if (campanaIdInicial && puedeDonar) {
+      setCampanaIdModalInicial(campanaIdInicial);
+      setFormulario('propia');
+      onCampanaIdConsumido?.();
+    }
+  }, [campanaIdInicial, puedeDonar]);
 
   const cargar = useCallback(async (): Promise<void> => {
     setCargando(true);
@@ -315,6 +333,7 @@ const DonacionesTab = ({ rol }: Props) => {
                     <th scope="col" className="px-6 py-3">Código</th>
                     <th scope="col" className="px-3 py-3">Fecha</th>
                     <th scope="col" className="px-3 py-3">Tipo</th>
+                    <th scope="col" className="px-3 py-3">Destino</th>
                     <th scope="col" className="px-3 py-3 text-right">{rol === 'Beneficiario' ? 'Asignado' : 'Comprometido'}</th>
                     {rol === 'Administrador' && <><th scope="col" className="px-3 py-3 text-right">Recibido</th><th scope="col" className="px-3 py-3 text-right">Pendiente recibir</th><th scope="col" className="px-3 py-3 text-right">Disponible</th></>}
                     {veDonante && <th scope="col" className="px-3 py-3">Donante</th>}
@@ -330,6 +349,17 @@ const DonacionesTab = ({ rol }: Props) => {
                       <td className="px-3 py-3">
                         {ETIQUETA_TIPO[d.tipo_donacion]}
                         {d.categoria && <span className="block text-xs text-text-muted">{d.categoria}</span>}
+                      </td>
+                      <td className="px-3 py-3">
+                        {d.campana_id ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800" title={`Campaña: ${d.campana_nombre || `#${d.campana_id}`}`}>
+                            🎯 {d.campana_nombre || `Campaña #${d.campana_id}`}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-surface-inset px-2.5 py-0.5 text-xs font-semibold text-text-muted border border-border" title="Donación al Inventario Central">
+                            📦 Inventario
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatoCantidad(d.cantidad, unidadMostrada(d))}</td>
                       {rol === 'Administrador' && (
@@ -360,7 +390,18 @@ const DonacionesTab = ({ rol }: Props) => {
                 <li key={d.id_donacion} className="space-y-2 px-4 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-semibold tabular-nums text-text">{d.codigo}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold tabular-nums text-text">{d.codigo}</p>
+                        {d.campana_id ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                            🎯 {d.campana_nombre || `Campaña #${d.campana_id}`}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-surface-inset px-2 py-0.5 text-[10px] font-bold text-text-muted">
+                            📦 Inventario
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-text-muted">
                         {formatoFecha(d.fecha_donacion)} · {ETIQUETA_TIPO[d.tipo_donacion]}
                         {d.categoria ? ` · ${d.categoria}` : ''}
@@ -403,7 +444,8 @@ const DonacionesTab = ({ rol }: Props) => {
       <DonacionFormModal
         isOpen={formulario !== null}
         modo={formulario ?? 'propia'}
-        onClose={() => setFormulario(null)}
+        campanaIdInicial={campanaIdModalInicial}
+        onClose={() => { setFormulario(null); setCampanaIdModalInicial(undefined); }}
         onGuardado={() => void cargar()}
       />
 

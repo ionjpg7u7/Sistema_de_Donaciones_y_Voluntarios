@@ -27,6 +27,7 @@ import path from 'path';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import donacionRoutes from './routes/donacionRoutes';
+import campanaRoutes from './routes/campanaRoutes';
 
 // ============================================================================
 // IMPORTACIÓN DE MIDDLEWARES GLOBALES
@@ -95,6 +96,9 @@ app.use('/api/usuarios', userRoutes);
 
 // Gestión de donaciones: módulo aislado, reutiliza la autenticación existente.
 app.use('/api/donaciones', donacionRoutes);
+
+// Gestión de campañas y actividades (Sprint 3)
+app.use('/api/campanas', campanaRoutes);
 
 // ============================================================================
 // RUTA PRINCIPAL
