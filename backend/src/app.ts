@@ -29,6 +29,7 @@ import userRoutes from './routes/userRoutes';
 import donacionRoutes from './routes/donacionRoutes';
 import campanaRoutes from './routes/campanaRoutes';
 import disponibilidadRoutes from './routes/disponibilidadRoutes';
+import ayudaRoutes from './routes/ayudaRoutes';
 
 // ============================================================================
 // IMPORTACIÓN DE MIDDLEWARES GLOBALES
@@ -103,6 +104,9 @@ app.use('/api/campanas', campanaRoutes);
 
 // Gestión de voluntarios: sección "Mi Disponibilidad" (Iteración 4)
 app.use('/api/voluntarios', disponibilidadRoutes);
+
+// Gestión de beneficiarios y solicitudes de ayuda.
+app.use('/api/ayudas', ayudaRoutes);
 
 // ============================================================================
 // RUTA PRINCIPAL

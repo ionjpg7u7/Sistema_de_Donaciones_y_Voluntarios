@@ -2,7 +2,7 @@
 
 # 🤝 Sistema de Donaciones y Voluntariados
 
-**Plataforma para conectar donantes, voluntarios y beneficiarios.** Incluye autenticación, gestión de usuarios y el módulo de Gestión de Donaciones con recepción, inventario central, fotografías y reportes. Campañas y Solicitudes de Ayuda quedan como integraciones futuras. Interfaz accesible en modo claro y oscuro.
+**Plataforma para conectar donantes, voluntarios y beneficiarios.** Incluye autenticación, gestión de usuarios, Gestión de Donaciones con recepción, inventario central, fotografías y reportes, Campañas y Actividades, y el módulo de Gestión de Beneficiarios y Ayudas. Interfaz accesible en modo claro y oscuro.
 
 ![Node.js](https://img.shields.io/badge/Node.js-20-339933?style=for-the-badge&logo=node.js&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-4-000000?style=for-the-badge&logo=express&logoColor=white)
@@ -15,7 +15,7 @@
 
 **Documento de onboarding técnico para equipos de desarrollo**
 
-`Módulo de usuarios: preservado` · `Gestión de Donaciones: integrada` · `Inventario: integrado` · `Campañas/Solicitudes de Ayuda: integración futura`
+`Módulo de usuarios: preservado` · `Gestión de Donaciones: integrada` · `Inventario: integrado` · `Campañas: integradas` · `Beneficiarios y Ayudas: integrado`
 
 </div>
 
@@ -92,9 +92,9 @@ Una plataforma web para gestionar el ciclo completo de la ayuda solidaria:
 
 La ruta privada `/donaciones` reutiliza el JWT y los roles canónicos existentes (Administrador, Donante, Voluntario y Beneficiario). El módulo incorpora registro, recepción, comprobantes, fotografías privadas, auditoría, reportes e inventario central. Los bienes aceptados en una recepción física ingresan automáticamente a `inventario` mediante un trigger PostgreSQL.
 
-Las tablas `inventario_destino` y sus columnas `campana_id` / `solicitud_ayuda_id` dejan preparado el vínculo de salida usando `id_inventario` + `id_donacion` + exactamente uno de los destinos. No se crean tablas ni endpoints de Campañas o Solicitudes de Ayuda, ni se inventan sus claves foráneas. Los puntos exactos que se completarán y las reglas de salida están documentados en `docs/INTEGRACION_CAMPANAS_SOLICITUDES.md`; el contrato API está en `backend/src/services/donacionIntegraciones.ts`.
+Las tablas `inventario_destino` y sus columnas `campana_id` / `solicitud_ayuda_id` enlazan la salida usando `id_inventario` + `id_donacion` + exactamente uno de los destinos. Campañas y Solicitudes de Ayuda ya cuentan con tablas, endpoints y claves foráneas; Donaciones solo consume sus contratos de lectura. Las reglas de salida están en `docs/INTEGRACION_CAMPANAS_SOLICITUDES.md` y el módulo de ayudas en `docs/AYUDAS.md`.
 
-**Base de datos:** se conservan únicamente `database/01_schema.sql` y `database/02_inserts.sql`. El SQL original de Usuarios se mantiene sin cambios; las tablas de Donaciones se agregan al final de `01_schema.sql`. En una base nueva, Docker ejecuta ambos archivos en orden. Si ya existe un volumen PostgreSQL, no vuelvas a ejecutar completos esos archivos: `01_schema.sql` contiene al inicio los `CREATE TABLE` originales de Usuarios. Haz backup y ejecuta únicamente el bloque de Donaciones que comienza en `-- MÓDULO 2: GESTIÓN DE DONACIONES`; para catálogos, ejecuta únicamente el bloque final `4. CATÁLOGOS INICIALES` de `02_inserts.sql`. Así no se duplican tablas ni usuarios.
+**Base de datos:** el esquema y los seeds están en `database/01_schema.sql`, `database/02_inserts.sql` y `database/03_solicitudes_ayuda.sql`. En una base nueva, Docker ejecuta los tres archivos en orden. Si ya existe un volumen PostgreSQL, no vuelvas a ejecutar completos `01_schema.sql` ni `02_inserts.sql`: `01_schema.sql` contiene los `CREATE TABLE` originales de Usuarios. Haz backup y aplica por separado únicamente los bloques nuevos o el script `03_solicitudes_ayuda.sql`; para catálogos, ejecuta únicamente el bloque final `4. CATÁLOGOS INICIALES` de `02_inserts.sql`. Así no se duplican tablas ni usuarios.
 
 **Fotografías:** JPG, PNG o WEBP, máximo 5 archivos de 5 MB por envío; se guardan en `backend/storage/donaciones`, fuera de la carpeta pública. En Docker el volumen `./backend/storage:/app/storage` conserva los archivos.
 
@@ -939,6 +939,12 @@ Checklist de calidad:
 | `PUT` | `/api/usuarios/:id` | Sí | Admin | Actualiza usuario |
 | `PUT` | `/api/usuarios/estado/:id` | Sí | Admin | Activa/desactiva |
 | `DELETE` | `/api/usuarios/:id` | Sí | Admin | Borrado lógico |
+| `GET` | `/api/ayudas/beneficiarios` | Sí | Admin | Directorio de beneficiarios verificados; acepta `?q=` |
+| `GET` | `/api/ayudas/solicitudes` | Sí | Admin o Beneficiario | Bandeja completa o historial propio; acepta `?estado=&tipo_ayuda=&q=` |
+| `GET` | `/api/ayudas/solicitudes/:id` | Sí | Admin o Beneficiario propietario | Detalle con asignaciones de donaciones |
+| `POST` | `/api/ayudas/solicitudes` | Sí | Admin o Beneficiario | Crea una solicitud `PENDIENTE` |
+| `PATCH` | `/api/ayudas/solicitudes/:id/revision` | Sí | Admin | Aprueba o rechaza con motivo |
+| `PATCH` | `/api/ayudas/solicitudes/:id/cierre` | Sí | Admin | Marca `ATENDIDA` o `CANCELADA` |
 
 ### 10.3 Autenticación
 
@@ -1605,7 +1611,10 @@ Reglas:
 | `/dashboard` | Dashboard | 🟡 | Postulaciones y bandejas de revisión; KPIs estáticos y módulos futuros deshabilitados |
 | `/perfil` | Perfil | ✅ | Datos, contraseña, foto y ubicación propia del donante |
 | `/usuarios` | Admin de usuarios | ✅ | Solo admin; tabla + cards + modal |
-| `/campanas`, `/donaciones`, `/voluntarios`, `/beneficios`, `/reportes` | Módulos futuros del sidebar | ⛔ | Se muestran con iconos como módulos en desarrollo; no hay rutas registradas |
+| `/campanas` | Campañas y actividades | ✅ | CRUD administrativo, actividades y participaciones |
+| `/donaciones` | Gestión de Donaciones | ✅ | Registro, recepción, inventario, asignaciones y reportes |
+| `/ayudas` | Beneficiarios y Ayudas | ✅ | Solicitudes propias (beneficiario) o bandeja y directorio (admin) |
+| `/voluntarios`, `/reportes` | Módulos futuros del sidebar | ⛔ | Se muestran con iconos como módulos en desarrollo; no hay rutas registradas |
 
 > El fallback `*` redirige a `/`. Si un equipo agrega tarjetas con enlaces a rutas no registradas, el usuario terminará en la landing.
 

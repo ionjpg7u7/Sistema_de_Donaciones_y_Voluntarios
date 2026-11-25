@@ -39,6 +39,7 @@ const Header = ({ onAbrirMenu }: HeaderProps) => {
   const titulosPorRuta: Record<string, string> = {
     '/dashboard': 'Inicio',
     '/usuarios': 'Gestión de Usuarios',
+    '/ayudas': 'Gestión de Beneficiarios y Ayudas',
     '/reportes': 'Reportes y Estadísticas',
     '/perfil': 'Mi Perfil',
     '/mi-disponibilidad': 'Mi Disponibilidad',

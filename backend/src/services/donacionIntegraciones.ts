@@ -1,18 +1,18 @@
 // src/services/donacionIntegraciones.ts
 // ============================================================================
-// PUNTO ÚNICO DE INTEGRACIÓN con módulos que aún no tienen esquema en el
-// repositorio: Campañas y Solicitudes de Ayuda.
+// PUNTO ÚNICO DE INTEGRACIÓN con los módulos propietarios de Campañas y
+// Solicitudes de Ayuda.
 //
-// Donaciones NO crea tablas ni lee/escribe tablas de otros módulos. Cuando
-// el equipo dueño de cada módulo entregue su esquema/API, solo hay que
-// reemplazar el cuerpo de estas funciones (y agregar la FK por migración):
+// Donaciones NO crea tablas ni escribe tablas de otros módulos. Este archivo
+// solo consume sus contratos de lectura:
 //
-//   campanasIntegracion.listarActivas()  → consultar campañas activas y en rango
-//   campanasIntegracion.estaActiva(id)   → existe, activa y dentro de fechas
+//   campanasIntegracion.listarActivas()  → campañas activas
+//   campanasIntegracion.estaActiva(id)   → existe y está activa
 //   solicitudesIntegracion.estaAprobada  → solicitud evaluada y aprobada
 // ============================================================================
 
 import { pool } from '../config/database';
+import { ayudaRepository } from '../repositories/ayudaRepository';
 
 export interface CampanaResumen {
   id_campana: number;
@@ -44,8 +44,8 @@ export const campanasIntegracion = {
 };
 
 export const solicitudesIntegracion = {
-  disponible: false,
-  async estaAprobada(_idSolicitud: number): Promise<boolean> {
-    return false;
+  disponible: true,
+  async estaAprobada(idSolicitud: number): Promise<boolean> {
+    return ayudaRepository.estaAprobada(idSolicitud);
   },
 };

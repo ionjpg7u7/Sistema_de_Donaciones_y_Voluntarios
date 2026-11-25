@@ -166,6 +166,45 @@ const KPIS_BENEFICIARIO: Kpi[] = [
     },
 ];
 
+const KPIS_BENEFICIARIO_PENDIENTE: Kpi[] = [
+    {
+        etiqueta: 'Solicitud',
+        valor: 'Pendiente',
+        detalle: 'En revisión',
+        delta: 'Activa',
+        tendencia: 'flat',
+        icono: ICONOS.reloj,
+        acento: 'bg-warning-soft text-warning',
+    },
+    {
+        etiqueta: 'Tipo',
+        valor: 'Beneficiario',
+        detalle: 'Perfil solidario',
+        delta: 'Registro',
+        tendencia: 'flat',
+        icono: ICONOS.perfil,
+        acento: 'bg-primary-soft text-primary',
+    },
+    {
+        etiqueta: 'Apoyos',
+        valor: '0',
+        detalle: 'Solicitudes habilitadas',
+        delta: 'Bloqueado',
+        tendencia: 'flat',
+        icono: ICONOS.documento,
+        acento: 'bg-info-soft text-info',
+    },
+    {
+        etiqueta: 'Próximo paso',
+        valor: 'Esperar',
+        detalle: 'Verificación del administrador',
+        delta: 'En curso',
+        tendencia: 'flat',
+        icono: ICONOS.escudo,
+        acento: 'bg-success-soft text-success',
+    },
+];
+
 const KPIS_VOLUNTARIO: Kpi[] = [
     {
         etiqueta: 'Postulaciones',
@@ -365,7 +404,7 @@ const MODULOS_DONANTE: Modulo[] = [
 
 const MODULOS_BENEFICIARIO: Modulo[] = [
     {
-        to: '/solicitar-apoyo',
+        to: '/ayudas?nueva=1',
         titulo: 'Solicitar Apoyo',
         descripcion: 'Registrá una solicitud de ayuda indicando tus necesidades prioritarias.',
         cta: 'Nueva Solicitud',
@@ -373,10 +412,10 @@ const MODULOS_BENEFICIARIO: Modulo[] = [
         iconoBg: 'bg-success-soft text-success',
         badge: 'Nuevo',
         badgeClass: 'bg-success-soft text-success',
-        enDesarrollo: true,
+        enDesarrollo: false,
     },
     {
-        to: '/mis-solicitudes',
+        to: '/ayudas',
         titulo: 'Mis Solicitudes',
         descripcion: 'Seguí el estado de tus solicitudes y revisá las respuestas recibidas.',
         cta: 'Ver Mis Solicitudes',
@@ -384,7 +423,7 @@ const MODULOS_BENEFICIARIO: Modulo[] = [
         iconoBg: 'bg-primary-soft text-primary',
         badge: 'Seguimiento',
         badgeClass: 'bg-primary-soft text-primary',
-        enDesarrollo: true,
+        enDesarrollo: false,
     },
     {
         to: '/campanas',
@@ -406,6 +445,31 @@ const MODULOS_BENEFICIARIO: Modulo[] = [
         badge: 'Perfil',
         badgeClass: 'bg-info-soft text-info',
         enDesarrollo: true,
+    },
+];
+
+const MODULOS_BENEFICIARIO_PENDIENTE: Modulo[] = [
+    {
+        to: '/perfil',
+        titulo: 'Completar mi perfil',
+        descripcion: 'Revisá y actualizá tus datos para agilizar la verificación del administrador.',
+        cta: 'Ir al perfil',
+        icono: ICONOS.perfil,
+        iconoBg: 'bg-primary-soft text-primary',
+        badge: 'Perfil',
+        badgeClass: 'bg-primary-soft text-primary',
+        enDesarrollo: false,
+    },
+    {
+        to: '/campanas',
+        titulo: 'Conocer campañas',
+        descripcion: 'Podés explorar las campañas mientras tu solicitud de beneficiario permanece en revisión.',
+        cta: 'Ver campañas',
+        icono: ICONOS.megafono,
+        iconoBg: 'bg-warning-soft text-warning',
+        badge: 'Información',
+        badgeClass: 'bg-warning-soft text-warning',
+        enDesarrollo: false,
     },
 ];
 
@@ -493,6 +557,15 @@ const PANEL_BENEFICIARIO: PanelRol = {
     cta: { etiqueta: 'Solicitar apoyo', icono: ICONOS.documento },
     seccionTitulo: 'Tus acciones como beneficiario',
     seccionSubtitulo: 'Estos módulos estarán disponibles próximamente.',
+};
+
+const PANEL_BENEFICIARIO_PENDIENTE: PanelRol = {
+    kpis: KPIS_BENEFICIARIO_PENDIENTE,
+    modulos: MODULOS_BENEFICIARIO_PENDIENTE,
+    descripcion: 'Tu solicitud de beneficiario está en revisión. Podés explorar campañas y completar tu perfil mientras esperás.',
+    cta: { etiqueta: 'Ver perfil', to: '/perfil', icono: ICONOS.perfil },
+    seccionTitulo: 'Tu solicitud de beneficiario',
+    seccionSubtitulo: 'Estas acciones están disponibles mientras el administrador verifica tu registro.',
 };
 
 const PANEL_VOLUNTARIO: PanelRol = {
@@ -811,17 +884,36 @@ const Dashboard = () => {
         }
     };
 
+    const tipoBeneficiario = String((usuario as any)?.tipo_beneficiario || '').trim();
+    const etiquetaTipoBeneficiario = tipoBeneficiario === 'Institucion'
+        ? 'Institución'
+        : tipoBeneficiario === 'Familia'
+            ? 'Familia'
+            : 'Persona';
+
+    const kpisBeneficiarioPendiente = KPIS_BENEFICIARIO_PENDIENTE.map((kpi) =>
+        kpi.etiqueta === 'Tipo'
+            ? { ...kpi, valor: etiquetaTipoBeneficiario, detalle: 'Tipo de beneficiario' }
+            : kpi
+    );
+    const panelBeneficiarioPendiente: PanelRol = {
+        ...PANEL_BENEFICIARIO_PENDIENTE,
+        kpis: kpisBeneficiarioPendiente,
+    };
+
     const panel = rolNormalizado === 'administrador' || rolNormalizado === 'admin'
         ? PANEL_ADMIN
         : esCoordinador
             ? PANEL_VOLUNTARIO
-            : rolNormalizado === 'donante'
-                ? PANEL_DONANTE
-                : rolNormalizado === 'beneficiario'
-                    ? PANEL_BENEFICIARIO
-                    : rolNormalizado === 'voluntario'
-                        ? PANEL_VOLUNTARIO
-                        : PANEL_USUARIO;
+            : estadoBen === 'Pendiente'
+                ? panelBeneficiarioPendiente
+                : rolNormalizado === 'donante'
+                    ? PANEL_DONANTE
+                    : rolNormalizado === 'beneficiario'
+                        ? PANEL_BENEFICIARIO
+                        : rolNormalizado === 'voluntario'
+                            ? PANEL_VOLUNTARIO
+                            : PANEL_USUARIO;
     const modulosDisponibles = panel.modulos.filter(modulo => !modulo.enDesarrollo);
 
     // ── Multi-rol: detectar roles secundarios del JWT (campo 'roles' o derivar del estado del usuario)

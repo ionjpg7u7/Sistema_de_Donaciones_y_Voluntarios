@@ -23,6 +23,7 @@ import Registro from './pages/Registro';
 import UsuariosPage from './pages/UsuariosPage';
 import DonacionesPage from './pages/DonacionesPage';
 import CampanasPage from './pages/CampanasPage';
+import AyudasPage from './pages/AyudasPage';
 import Perfil from './pages/Perfil';
 import Dashboard from './pages/Dashboard';
 import SolicitarRecuperacion from './pages/SolicitarRecuperacion';
@@ -60,6 +61,7 @@ function App() {
             <Route path="/perfil" element={<Perfil />} />
             <Route path="/donaciones" element={<DonacionesPage />} />
             <Route path="/campanas" element={<CampanasPage />} />
+            <Route path="/ayudas" element={<AyudasPage />} />
 
             {/* SECCIÓN 5: MI DISPONIBILIDAD (Voluntario / Coordinador) */}
             <Route element={<RutasPorRol roles={['Voluntario', 'Empleado', 'Coordinador']} />}>

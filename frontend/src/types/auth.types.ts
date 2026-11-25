@@ -27,6 +27,7 @@ export interface LoginResponse {
     es_donante?: boolean;
     estado_voluntario?: string | null;
     estado_beneficiario?: string | null;
+    tipo_beneficiario?: 'Persona' | 'Familia' | 'Institucion' | null;
   };
 }
 

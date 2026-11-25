@@ -168,6 +168,7 @@ const firmarToken = (usuario: UsuarioResponse): string =>
       es_donante: Boolean(usuario.es_donante),
       estado_voluntario: usuario.estado_voluntario ?? null,
       estado_beneficiario: usuario.estado_beneficiario ?? null,
+      tipo_beneficiario: usuario.tipo_beneficiario ?? null,
       foto_url: usuario.foto_url,
     },
     process.env.JWT_SECRET as string,

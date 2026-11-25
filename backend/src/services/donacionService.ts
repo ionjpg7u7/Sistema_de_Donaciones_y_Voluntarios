@@ -510,7 +510,7 @@ export const donacionService = {
 
     if (datos.solicitud_ayuda_id !== null && !(await solicitudesIntegracion.estaAprobada(datos.solicitud_ayuda_id))) {
       throw new AppError(
-        'No se puede validar la solicitud de ayuda indicada (módulo aún no disponible). Asigna directamente al beneficiario.',
+        'No se puede asignar: la solicitud de ayuda indicada no existe o no está aprobada.',
         400
       );
     }
